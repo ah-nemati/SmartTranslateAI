@@ -15,15 +15,20 @@ env:
 
 jobs:
   # =========================================================
-  # ANDROID FIRST (CRITICAL)
+  # ANDROID (FIRST + CRITICAL)
   # =========================================================
   android:
-    name: Android Build (FIRST)
+    name: Android Build (FIRST - MUST PASS)
     runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Clean Buildozer cache (IMPORTANT)
+        run: |
+          rm -rf ~/.buildozer || true
+          rm -rf .buildozer || true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -42,14 +47,14 @@ jobs:
             zlib1g-dev libffi-dev libssl-dev \
             libncurses6 libtinfo6 libstdc++6
 
-      - name: Install Python dependencies
+      - name: Install Python dependencies (PINNED STABLE)
         run: |
           python -m pip install --upgrade pip
 
-          pip install --upgrade \
-            buildozer \
-            cython \
-            python-for-android \
+          pip install \
+            buildozer==1.5.0 \
+            cython==0.29.36 \
+            python-for-android==2024.1.21 \
             kivy==2.3.0
 
       - name: Build Android APK
@@ -173,7 +178,7 @@ jobs:
         run: |
           test -f dist/${{ env.APP_NAME }} || exit 1
 
-      - name: Create DEB
+      - name: Create DEB package
         run: |
           mkdir -p package/usr/local/bin
           mkdir -p package/DEBIAN
@@ -207,7 +212,7 @@ jobs:
   # RELEASE (ONLY IF ALL SUCCESS)
   # =========================================================
   release:
-    name: Release
+    name: GitHub Release
     runs-on: ubuntu-latest
 
     needs: [android, windows, linux]
@@ -223,7 +228,7 @@ jobs:
         with:
           path: artifacts
 
-      - name: Validate
+      - name: Validate artifacts
         run: |
           find artifacts -type f
 
@@ -233,6 +238,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: SmartTranslateAi ${{ github.ref_name }}
           generate_release_notes: true
+          draft: false
+          prerelease: false
           files: |
             artifacts/android/*.apk
             artifacts/windows/*.exe
