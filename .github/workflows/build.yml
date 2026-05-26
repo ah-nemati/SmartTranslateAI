@@ -1,0 +1,53 @@
+name: Build and Package SmartTranslateAi
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # به شما اجازه می‌دهد دستی هم ساخت را اجرا کنید
+
+jobs:
+  release:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: SmartTranslateAi-Windows.zip
+            asset_path: dist/SmartTranslateAi.exe
+          - os: ubuntu-latest
+            artifact_name: SmartTranslateAi-Linux.tar.gz
+            asset_path: dist/SmartTranslateAi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pyside6 aiohttp python-dotenv
+
+      - name: Build with PyInstaller (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          pyinstaller --name "SmartTranslateAi" --windowed --noconsole --onefile --noconfirm --clean app/main.py
+
+      - name: Build with PyInstaller (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          pyinstaller --name "SmartTranslateAi" --windowed --noconsole --onefile --noconfirm --clean app/main.py
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_path }}
