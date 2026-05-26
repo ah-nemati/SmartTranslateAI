@@ -15,11 +15,11 @@ env:
 
 jobs:
   # =========================================================
-  # WINDOWS
+  # ANDROID FIRST (CRITICAL)
   # =========================================================
-  windows:
-    name: Windows Build
-    runs-on: windows-latest
+  android:
+    name: Android Build (FIRST)
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -30,18 +30,68 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Upgrade pip
-        shell: pwsh
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            git zip unzip wget curl \
+            openjdk-17-jdk \
+            build-essential \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libffi-dev libssl-dev \
+            libncurses6 libtinfo6 libstdc++6
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+
+          pip install --upgrade \
+            buildozer \
+            cython \
+            python-for-android \
+            kivy==2.3.0
+
+      - name: Build Android APK
+        run: |
+          cd app
+          buildozer android debug
+
+      - name: Verify APK
+        run: |
+          find app/bin -name "*.apk" | grep apk || exit 1
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: app/bin/*.apk
+
+  # =========================================================
+  # WINDOWS (ONLY IF ANDROID SUCCESS)
+  # =========================================================
+  windows:
+    name: Windows Build
+    runs-on: windows-latest
+    needs: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         shell: pwsh
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build Windows EXE
+      - name: Build EXE
         shell: pwsh
         run: |
           pyinstaller `
@@ -73,12 +123,11 @@ jobs:
           path: dist/${{ env.APP_NAME }}.exe
 
   # =========================================================
-  # LINUX
+  # LINUX (ONLY IF WINDOWS SUCCESS)
   # =========================================================
   linux:
     name: Linux Build
     runs-on: ubuntu-24.04
-
     needs: windows
 
     steps:
@@ -90,34 +139,21 @@ jobs:
           sudo apt-get update
 
           sudo apt-get install -y \
-            dpkg-dev \
-            fakeroot \
-            libglib2.0-0 \
-            libgl1 \
-            libx11-6 \
-            libxext6 \
-            libxrender1 \
-            libxcb1 \
-            libxcb-cursor0 \
-            libxkbcommon-x11-0 \
-            libdbus-1-3 \
-            libnss3 \
-            libfontconfig1 \
-            libfreetype6 \
-            libegl1 \
-            libasound2t64
+            dpkg-dev fakeroot \
+            libglib2.0-0 libgl1 libx11-6 libxext6 \
+            libxrender1 libxcb1 libxcb-cursor0 \
+            libxkbcommon-x11-0 libdbus-1-3 \
+            libnss3 libfontconfig1 libfreetype6 \
+            libegl1 libasound2t64
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Upgrade pip
-        run: |
-          python -m pip install --upgrade pip
-
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
@@ -129,45 +165,21 @@ jobs:
             --onefile \
             --windowed \
             --name "${{ env.APP_NAME }}" \
-            --hidden-import=PySide6.QtCore \
-            --hidden-import=PySide6.QtGui \
-            --hidden-import=PySide6.QtWidgets \
-            --hidden-import=PySide6.QtNetwork \
-            --hidden-import=PySide6.QtXcbQpa \
             --collect-all PySide6 \
             --collect-all aiohttp \
             app/main.py
 
-      - name: Verify Linux Binary
+      - name: Verify Binary
         run: |
           test -f dist/${{ env.APP_NAME }} || exit 1
-          chmod +x dist/${{ env.APP_NAME }}
 
-      # =====================================================
-      # CREATE DEB PACKAGE
-      # =====================================================
-      - name: Create Debian package structure
+      - name: Create DEB
         run: |
-          mkdir -p package/DEBIAN
           mkdir -p package/usr/local/bin
-          mkdir -p package/usr/share/applications
+          mkdir -p package/DEBIAN
 
           cp dist/${{ env.APP_NAME }} package/usr/local/bin/
 
-      - name: Create desktop entry
-        run: |
-          cat > package/usr/share/applications/${{ env.LINUX_PACKAGE_NAME }}.desktop <<EOF
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=SmartTranslateAi
-          Exec=/usr/local/bin/${{ env.APP_NAME }}
-          Terminal=false
-          Categories=Utility;
-          EOF
-
-      - name: Create control file
-        run: |
           VERSION=${GITHUB_REF_NAME#v}
 
           cat > package/DEBIAN/control <<EOF
@@ -180,18 +192,10 @@ jobs:
           Description: SmartTranslateAi Cross Platform Translator
           EOF
 
-      - name: Build DEB
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-
           dpkg-deb --build package \
-            ${{ env.LINUX_PACKAGE_NAME }}-${VERSION}-amd64.deb
+            ${{ env.LINUX_PACKAGE_NAME }}-${VERSION}.deb
 
-      - name: Verify DEB
-        run: |
-          find . -name "*.deb" | grep deb || exit 1
-
-      - name: Upload Linux Artifacts
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -200,162 +204,28 @@ jobs:
             *.deb
 
   # =========================================================
-  # ANDROID
-  # =========================================================
-  android:
-    name: Android Build
-    runs-on: ubuntu-24.04
-
-    needs: linux
-
-    env:
-      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
-      ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-
-          sudo apt-get install -y \
-            git \
-            zip \
-            unzip \
-            wget \
-            curl \
-            openjdk-17-jdk \
-            build-essential \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
-            zlib1g-dev \
-            libncurses6 \
-            libtinfo6 \
-            libstdc++6 \
-            libffi-dev \
-            libssl-dev
-
-      - name: Upgrade pip
-        run: |
-          python -m pip install --upgrade pip
-
-      - name: Install Python packages
-        run: |
-          pip install --upgrade \
-            buildozer \
-            cython \
-            python-for-android \
-            kivy==2.3.0
-
-      # =====================================================
-      # INSTALL ANDROID SDK
-      # =====================================================
-      - name: Install Android SDK
-        run: |
-          mkdir -p $ANDROID_HOME/cmdline-tools
-
-          cd /tmp
-
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-
-          unzip -q commandlinetools-linux-11076708_latest.zip
-
-          mv cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/build-tools/37.0.0" >> $GITHUB_PATH
-
-      - name: Accept Android Licenses
-        run: |
-          yes | sdkmanager --licenses
-
-      - name: Install Android SDK Packages
-        run: |
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;37.0.0"
-
-      - name: Verify Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-
-          find $ANDROID_HOME -name aidl
-
-          test -f $ANDROID_HOME/build-tools/37.0.0/aidl
-
-      - name: Verify buildozer.spec
-        run: |
-          test -f app/buildozer.spec || \
-          (echo "Missing buildozer.spec" && exit 1)
-
-      - name: Build APK
-        run: |
-          cd app
-
-          buildozer android debug
-
-      - name: Verify APK
-        run: |
-          find app/bin -name "*.apk" | grep apk || exit 1
-
-      - name: Upload Android Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android
-          path: app/bin/*.apk
-
-  # =========================================================
-  # RELEASE
+  # RELEASE (ONLY IF ALL SUCCESS)
   # =========================================================
   release:
-    name: GitHub Release
-
+    name: Release
     runs-on: ubuntu-latest
 
-    needs:
-      - windows
-      - linux
-      - android
+    needs: [android, windows, linux]
 
     if: |
+      needs.android.result == 'success' &&
       needs.windows.result == 'success' &&
-      needs.linux.result == 'success' &&
-      needs.android.result == 'success'
+      needs.linux.result == 'success'
 
     steps:
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Debug artifact structure
+      - name: Validate
         run: |
-          ls -R artifacts
-
-      - name: Validate release files
-        run: |
-          echo "Checking Windows EXE..."
-          test -f artifacts/windows/${APP_NAME}.exe || exit 1
-
-          echo "Checking Linux binary..."
-          test -f artifacts/linux/${APP_NAME} || exit 1
-
-          echo "Checking Debian package..."
-          find artifacts/linux -name "*.deb" | grep deb || exit 1
-
-          echo "Checking Android APK..."
-          find artifacts/android -name "*.apk" | grep apk || exit 1
+          find artifacts -type f
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -363,14 +233,9 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: SmartTranslateAi ${{ github.ref_name }}
           generate_release_notes: true
-          draft: false
-          prerelease: false
-
           files: |
+            artifacts/android/*.apk
             artifacts/windows/*.exe
             artifacts/linux/*.deb
-            artifacts/linux/SmartTranslateAi
-            artifacts/android/*.apk
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
