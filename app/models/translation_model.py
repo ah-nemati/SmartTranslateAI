@@ -8,12 +8,12 @@ class ContentType(Enum):
 @dataclass
 class TranslationRequest:
     text: str
-    source_language: str
-    target_language: str
-    content_type: ContentType
+    source_language: str = "English"
+    target_language: str = "Persian"
+    content_type: ContentType = ContentType.SUBTITLE
 
 @dataclass
 class TranslationResult:
     success: bool
-    translated_text: str
+    translated_text: str = ""
     error: str | None = None
