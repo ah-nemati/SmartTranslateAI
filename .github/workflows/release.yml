@@ -13,10 +13,10 @@ env:
   APP_NAME: SmartTranslateAi
   LINUX_PACKAGE_NAME: smarttranslateai
 
-# =========================================================
-# JOB 1: ANDROID (FIRST - MUST PASS)
-# =========================================================
 jobs:
+  # =========================================================
+  # JOB 1: ANDROID (FIRST - MUST PASS)
+  # =========================================================
   android:
     name: Android Build (FIRST)
     runs-on: ubuntu-22.04
@@ -43,24 +43,27 @@ jobs:
           sudo apt-get install -y \
             git zip unzip wget curl \
             openjdk-17-jdk \
-            build-essential \
+            build-essential cmake ninja-build lld \
             autoconf automake libtool pkg-config \
             zlib1g-dev libffi-dev libssl-dev \
             libncurses6 libtinfo6 libstdc++6
 
-      - name: Install Python dependencies (STABLE PINNED)
+      - name: Install Python dependencies (LATEST STABLE)
         run: |
           python -m pip install --upgrade pip
 
           pip install \
-            buildozer==1.5.0 \
+            buildozer \
             cython==0.29.36 \
-            python-for-android==2023.9.16 \
-            kivy==2.3.0
+            python-for-android \
+            kivy
 
       - name: Build Android APK
         run: |
           cd app
+          # Force log_level to 2 (debug) to expose the actual compiler error
+          sed -i -e 's/^log_level = [0-9]/log_level = 2/' buildozer.spec
+
           buildozer android debug
 
       - name: Verify APK
