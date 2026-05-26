@@ -1,0 +1,5 @@
+[project]
+name = "smart-translate-ai"
+version = "0.1.0"
+description = "AI Desktop Translation App"
+requires-python = ">=3.11"

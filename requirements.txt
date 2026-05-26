@@ -1,0 +1,5 @@
+aiohttp
+pyside6
+python-dotenv
+pysrt
+webvtt-py
