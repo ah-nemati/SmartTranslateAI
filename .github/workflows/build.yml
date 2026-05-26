@@ -2,10 +2,8 @@ name: Build and Package SmartTranslateAi
 
 on:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
-  workflow_dispatch: # به شما اجازه می‌دهد دستی هم ساخت را اجرا کنید
+    tags:
+      - "v*"
 
 jobs:
   release:
@@ -36,18 +34,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller pyside6 aiohttp python-dotenv
 
-      - name: Build with PyInstaller (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build with PyInstaller
         run: |
+          # ساخت فایل اجرایی
           pyinstaller --name "SmartTranslateAi" --windowed --noconsole --onefile --noconfirm --clean app/main.py
 
-      - name: Build with PyInstaller (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          pyinstaller --name "SmartTranslateAi" --windowed --noconsole --onefile --noconfirm --clean app/main.py
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.asset_path }}
+          files: |
+            dist/SmartTranslateAi.exe
+            dist/SmartTranslateAi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
