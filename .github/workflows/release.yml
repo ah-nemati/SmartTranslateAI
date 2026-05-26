@@ -62,12 +62,11 @@ jobs:
       - name: Build Android APK
         run: |
           cd app
-          # پاکسازی کش داخلی بیلدوزر قبل از بیلد جدید
-          buildozer android clean
 
           # Ensure debug logging is enabled if it fails again
           sed -i -e 's/^log_level = [0-9]/log_level = 2/' buildozer.spec
 
+          # مستقیما بیلد را اجرا می‌کنیم
           buildozer android debug
         env:
           PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
