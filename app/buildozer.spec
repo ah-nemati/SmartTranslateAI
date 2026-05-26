@@ -1,27 +1,130 @@
 [app]
 
+# =========================================================
+# BASIC
+# =========================================================
 title = SmartTranslateAi
+
 package.name = smarttranslateai
 package.domain = org.smarttranslate
 
+source.dir = .
+
+source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ini,txt
+
 version = 1.3.0
 
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ini,json
+# =========================================================
+# ENTRYPOINT
+# =========================================================
+# اگر main.py داخل app/ هست:
+# main.py باید تابع main نداشته باشد
+# و مستقیم اجرا شود
 
+# =========================================================
+# DISPLAY
+# =========================================================
 orientation = portrait
+
 fullscreen = 0
 
-android.permissions = INTERNET,ACCESS_NETWORK_STATE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+# =========================================================
+# REQUIREMENTS
+# =========================================================
+requirements = \
+    python3==3.11.9, \
+    kivy==2.3.0, \
+    aiohttp
 
-android.api = 33
+# =========================================================
+# ANDROID
+# =========================================================
+android.api = 34
+
 android.minapi = 24
+
+android.ndk = 25b
+
 android.ndk_api = 24
 
-requirements = python3,kivy==2.3.0,aiohttp
+android.accept_sdk_license = True
 
-p4a.arch = arm64-v8a
+# =========================================================
+# PERMISSIONS
+# =========================================================
+android.permissions = \
+    INTERNET, \
+    ACCESS_NETWORK_STATE
+
+# =========================================================
+# ARCHITECTURE
+# =========================================================
+android.archs = arm64-v8a
+
+# =========================================================
+# PERFORMANCE
+# =========================================================
+android.enable_androidx = True
+
+android.allow_backup = True
+
+android.release_artifact = apk
+
+# =========================================================
+# LOGGING
+# =========================================================
+log_level = 2
+
+# =========================================================
+# EXCLUDE FILES
+# =========================================================
+source.exclude_dirs = \
+    venv, \
+    env, \
+    .venv, \
+    .git, \
+    .github, \
+    __pycache__, \
+    tests, \
+    build, \
+    dist
+
+source.exclude_patterns = \
+    *.spec, \
+    *.pyc, \
+    *.pyo
+
+# =========================================================
+# BUILD
+# =========================================================
+warn_on_root = 1
+
+# =========================================================
+# KIVY
+# =========================================================
+osx.python_version = 3
+
+osx.kivy_version = 2.3.0
+
+# =========================================================
+# P4A
+# =========================================================
+p4a.branch = master
+
+p4a.bootstrap = sdl2
+
+# =========================================================
+# SPLASH
+# =========================================================
+# presplash.filename = assets/presplash.png
+# icon.filename = assets/icon.png
+
+# =========================================================
+# END
+# =========================================================
 
 [buildozer]
+
 log_level = 2
+
 warn_on_root = 1

@@ -33,7 +33,9 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
+
           pip install -r requirements.txt
+
           pip install pyinstaller
 
       - name: Build Windows EXE
@@ -68,7 +70,7 @@ jobs:
           path: dist/${{ env.APP_NAME }}.exe
 
   # =========================================================
-  # LINUX (.deb + binary)
+  # LINUX
   # =========================================================
   linux:
     runs-on: ubuntu-24.04
@@ -107,7 +109,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+
           pip install -r requirements.txt
+
           pip install pyinstaller
 
       - name: Build Linux Binary
@@ -130,15 +134,19 @@ jobs:
       - name: Verify Binary
         run: |
           test -f dist/${{ env.APP_NAME }} || exit 1
+
           chmod +x dist/${{ env.APP_NAME }}
 
-      # ================= CREATE .DEB =================
+      # =====================================================
+      # CREATE DEB PACKAGE
+      # =====================================================
       - name: Create Debian package structure
         run: |
           mkdir -p package/DEBIAN
+
           mkdir -p package/usr/local/bin
+
           mkdir -p package/usr/share/applications
-          mkdir -p package/usr/share/icons/hicolor/256x256/apps
 
           cp dist/${{ env.APP_NAME }} package/usr/local/bin/
 
@@ -150,12 +158,11 @@ jobs:
           Type=Application
           Name=SmartTranslateAi
           Exec=/usr/local/bin/${{ env.APP_NAME }}
-          Icon=${{ env.LINUX_PACKAGE_NAME }}
           Terminal=false
           Categories=Utility;
           EOF
 
-      - name: Create DEBIAN control file
+      - name: Create control file
         run: |
           VERSION=${GITHUB_REF_NAME#v}
 
@@ -169,16 +176,12 @@ jobs:
           Description: SmartTranslateAi Cross Platform Translator
           EOF
 
-      - name: Build .deb package
+      - name: Build DEB
         run: |
           VERSION=${GITHUB_REF_NAME#v}
 
           dpkg-deb --build package \
             ${{ env.LINUX_PACKAGE_NAME }}-${VERSION}-amd64.deb
-
-      - name: Verify .deb
-        run: |
-          ls -la *.deb || exit 1
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -195,8 +198,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      ANDROID_HOME: /home/runner/android-sdk
-      ANDROID_SDK_ROOT: /home/runner/android-sdk
+      ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+      ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
 
     steps:
       - name: Checkout
@@ -205,7 +208,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.11"
 
       - name: Install system dependencies
         run: |
@@ -218,15 +221,17 @@ jobs:
             wget \
             openjdk-17-jdk \
             build-essential \
-            libffi-dev \
-            libssl-dev \
             autoconf \
             automake \
             libtool \
             pkg-config \
-            zlib1g-dev
+            zlib1g-dev \
+            libncurses5 \
+            libstdc++6 \
+            libffi-dev \
+            libssl-dev
 
-      - name: Install Python dependencies
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
 
@@ -236,47 +241,44 @@ jobs:
             kivy==2.3.0
 
       # =====================================================
-      # ANDROID SDK
+      # INSTALL ANDROID SDK
       # =====================================================
-      - name: Setup Android SDK
+      - name: Install Android SDK
         run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
+          mkdir -p $ANDROID_HOME/cmdline-tools
 
-          cd $HOME/android-sdk/cmdline-tools
+          cd /tmp
 
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
 
           unzip commandlinetools-linux-11076708_latest.zip
 
-          mv cmdline-tools latest
+          mv cmdline-tools $ANDROID_HOME/cmdline-tools/latest
 
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/build-tools/33.0.2" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      - name: Install Android SDK Packages
+          echo "$ANDROID_HOME/build-tools/37.0.0" >> $GITHUB_PATH
+
+      - name: Accept Android Licenses
         run: |
           yes | sdkmanager --licenses
 
+      - name: Install Android SDK Packages
+        run: |
           sdkmanager \
             "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2"
+            "platforms;android-34" \
+            "build-tools;37.0.0"
 
-      - name: Verify Android SDK
+      - name: Verify SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
 
-          ls -la $ANDROID_HOME
-
-          echo "Searching for aidl..."
-
           find $ANDROID_HOME -name aidl
 
-          test -f $ANDROID_HOME/build-tools/33.0.2/aidl
+          test -f $ANDROID_HOME/build-tools/37.0.0/aidl
 
       - name: Verify buildozer.spec
         run: |
@@ -286,6 +288,7 @@ jobs:
       - name: Build APK
         run: |
           cd app
+
           buildozer android debug
 
       - name: Verify APK
@@ -303,6 +306,7 @@ jobs:
   # =========================================================
   release:
     needs: [windows, linux, android]
+
     runs-on: ubuntu-latest
 
     steps:
@@ -311,32 +315,29 @@ jobs:
         with:
           path: artifacts
 
-      - name: Debug artifact structure
-        run: |
-          ls -R artifacts
-
       - name: Validate release files
         run: |
-          echo "Checking Windows EXE..."
           test -f artifacts/windows/${APP_NAME}.exe || exit 1
 
-          echo "Checking Linux binary..."
           test -f artifacts/linux/${APP_NAME} || exit 1
 
-          echo "Checking Debian package..."
           find artifacts/linux -name "*.deb" | grep deb || exit 1
 
-          echo "Checking Android APK..."
           find artifacts/android -name "*.apk" | grep apk || exit 1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+
           name: SmartTranslateAi ${{ github.ref_name }}
+
           generate_release_notes: true
+
           draft: false
+
           prerelease: false
+
           files: |
             artifacts/windows/*.exe
             artifacts/linux/*.deb
