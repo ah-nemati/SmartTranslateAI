@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system libraries
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -73,7 +73,7 @@ jobs:
           name: SmartTranslateAi-Linux
           path: dist/${{ env.APP_NAME }}
 
-  # ================= ANDROID (FIXED) =================
+  # ================= ANDROID (FIXED + STABLE) =================
   android:
     runs-on: ubuntu-latest
 
@@ -87,7 +87,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk \
+          sudo apt-get install -y git zip unzip wget openjdk-17-jdk \
             build-essential libffi-dev libssl-dev
 
       - name: Install Buildozer
@@ -95,19 +95,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install buildozer cython kivy==2.3.0
 
-      - name: Check buildozer spec
+      # ================= ANDROID SDK SETUP =================
+      - name: Setup Android SDK
+        run: |
+          mkdir -p $HOME/android-sdk
+          cd $HOME/android-sdk
+
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip commandlinetools-linux-*.zip
+
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/* cmdline-tools/latest/ || true
+
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+          yes | sdkmanager --licenses || true
+
+          sdkmanager "platform-tools" \
+                     "platforms;android-33" \
+                     "build-tools;33.0.2"
+
+      # ================= BUILD CHECK =================
+      - name: Verify buildozer.spec
         run: |
           if [ ! -f app/buildozer.spec ]; then
             echo "ERROR: buildozer.spec not found in app/"
             exit 1
           fi
 
+      # ================= BUILD APK =================
       - name: Build Android APK
         run: |
           cd app
           buildozer -v android debug
 
-      - name: Upload Android APK
+      # ================= UPLOAD APK =================
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartTranslateAi-Android
