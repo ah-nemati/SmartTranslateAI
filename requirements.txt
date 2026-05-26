@@ -3,4 +3,4 @@ aiohttp==3.11.11
 pysrt
 webvtt-py
 python-dotenv
-kivy==2.3.0 
+kivy==2.3.0

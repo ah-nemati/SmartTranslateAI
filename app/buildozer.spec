@@ -31,10 +31,8 @@ fullscreen = 0
 # =========================================================
 # REQUIREMENTS
 # =========================================================
-requirements = \
-    python3==3.11.9, \
-    kivy==2.3.0, \
-    aiohttp
+# PYSIDE6 MUST NOT BE HERE. ONLY KIVY AND PURE PYTHON LIBS.
+requirements = python3, kivy==2.3.0, aiohttp==3.11.11, pysrt, webvtt-py, python-dotenv
 
 # =========================================================
 # ANDROID
@@ -52,9 +50,7 @@ android.accept_sdk_license = True
 # =========================================================
 # PERMISSIONS
 # =========================================================
-android.permissions = \
-    INTERNET, \
-    ACCESS_NETWORK_STATE
+android.permissions = INTERNET, ACCESS_NETWORK_STATE
 
 # =========================================================
 # ARCHITECTURE
@@ -78,21 +74,9 @@ log_level = 2
 # =========================================================
 # EXCLUDE FILES
 # =========================================================
-source.exclude_dirs = \
-    venv, \
-    env, \
-    .venv, \
-    .git, \
-    .github, \
-    __pycache__, \
-    tests, \
-    build, \
-    dist
+source.exclude_dirs = venv, env, .venv, .git, .github, __pycache__, tests, build, dist
 
-source.exclude_patterns = \
-    *.spec, \
-    *.pyc, \
-    *.pyo
+source.exclude_patterns = *.spec, *.pyc, *.pyo
 
 # =========================================================
 # BUILD

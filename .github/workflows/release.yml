@@ -36,13 +36,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install system dependencies
+      - name: Install system dependencies (INCLUDES python3-dev FIX)
         run: |
           sudo apt-get update
 
           sudo apt-get install -y \
             git zip unzip wget curl \
-            openjdk-17-jdk \
+            openjdk-17-jdk python3-dev \
             build-essential cmake ninja-build lld \
             autoconf automake libtool pkg-config \
             zlib1g-dev libffi-dev libssl-dev \
@@ -61,7 +61,7 @@ jobs:
       - name: Build Android APK
         run: |
           cd app
-          # Force log_level to 2 (debug) to expose the actual compiler error
+          # Ensure debug logging is enabled if it fails again
           sed -i -e 's/^log_level = [0-9]/log_level = 2/' buildozer.spec
 
           buildozer android debug
