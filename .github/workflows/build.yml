@@ -8,127 +8,149 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
-  # ==================== Windows ====================
+  # ==================== WINDOWS ====================
   build-windows:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install pyinstaller pyside6 aiohttp python-dotenv pysrt webvtt-py
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pyside6 aiohttp python-dotenv pysrt webvtt-py
 
       - name: Build Windows EXE
         run: |
-          pyinstaller --clean --noconfirm ^
-            --onefile --windowed --noconsole ^
-            --name SmartTranslateAi ^
-            --hidden-import=PySide6.QtCore ^
-            --hidden-import=PySide6.QtGui ^
-            --hidden-import=PySide6.QtWidgets ^
-            --collect-all PySide6 ^
-            app/main.py
+          pyinstaller --clean --noconfirm --onefile --windowed ^
+          --name "SmartTranslateAi" ^
+          --hidden-import=PySide6.QtCore ^
+          --hidden-import=PySide6.QtGui ^
+          --hidden-import=PySide6.QtWidgets ^
+          --hidden-import=PySide6.QtNetwork ^
+          --collect-all PySide6 ^
+          --collect-all aiohttp ^
+          app/main.py
 
-      - name: Upload Windows
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartTranslateAi-Windows
           path: dist/SmartTranslateAi.exe
 
-  # ==================== Linux (Ubuntu 24.04) ====================
+  # ==================== LINUX ====================
   build-linux:
     runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (Ubuntu 24.04)
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libglib2.0-0 libgl1 libx11-6 libxext6 libxrender1 libxcb1 \
-            libxcb-cursor0 libfontconfig1 libfreetype6 libxi6 libxkbcommon0 \
-            libxcb-xkb1 libxcb-render0 libxcb-image0 libxcb-keysyms1 \
-            libxcb-randr0 libxcb-shape0 libxcb-xfixes0 libxcb-icccm4 \
-            libxcb-util1 libxcb-sync1 libopengl0 libegl1
+          libglib2.0-0 libgl1 libx11-6 libxext6 libxrender1 \
+          libxcb1 libxcb-cursor0 libxcb-xinerama0 libxcb-xkb1 \
+          libxkbcommon-x11-0 libxkbcommon0 \
+          libdbus-1-3 libnss3 libasound2 \
+          libfontconfig1 libfreetype6 libxi6 libegl1
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Python dependencies
-        run: pip install pyinstaller pyside6 aiohttp python-dotenv pysrt webvtt-py
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pyside6 aiohttp python-dotenv pysrt webvtt-py
 
       - name: Build Linux Executable
         run: |
-          pyinstaller --clean --noconfirm \
-            --onefile --windowed --noconsole \
-            --name SmartTranslateAi \
-            --hidden-import=PySide6.QtCore \
-            --hidden-import=PySide6.QtGui \
-            --hidden-import=PySide6.QtWidgets \
-            --hidden-import=PySide6.QtNetwork \
-            --hidden-import=PySide6.QtXcbQpa \
-            --collect-all PySide6 \
-            --collect-all aiohttp \
-            app/main.py
+          pyinstaller --clean --noconfirm --onefile --windowed \
+          --name "SmartTranslateAi" \
+          --hidden-import=PySide6.QtCore \
+          --hidden-import=PySide6.QtGui \
+          --hidden-import=PySide6.QtWidgets \
+          --hidden-import=PySide6.QtNetwork \
+          --hidden-import=PySide6.QtXcbQpa \
+          --collect-all PySide6 \
+          --collect-all aiohttp \
+          app/main.py
 
-      - name: Make executable
+      - name: Fix executable permission
         run: chmod +x dist/SmartTranslateAi
 
-      - name: Upload Linux
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SmartTranslateAi-Linux-Ubuntu24
+          name: SmartTranslateAi-Linux
           path: dist/SmartTranslateAi
 
-  # ==================== Android APK ====================
+  # ==================== ANDROID ====================
   build-android:
     runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Android build tools
+      - name: Install dependencies
         run: |
-          pip install pyside6-android-deploy
+          python -m pip install --upgrade pip
+          pip install pyside6 pyside6-android-deploy
 
       - name: Build Android APK
         run: |
-          pyside6-android-deploy --release --arch arm64-v8a app/main.py
+          export VERSION=${GITHUB_REF_NAME#v}
+          pyside6-android-deploy \
+            --release \
+            --arch arm64-v8a \
+            --name "SmartTranslateAi" \
+            --version "$VERSION"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: SmartTranslateAi-Android
-          path: deploy/android/build/outputs/apk/release/*.apk
+          path: "**/*.apk"
 
-  # ==================== Release ====================
+  # ==================== RELEASE ====================
   release:
     needs: [build-windows, build-linux, build-android]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
 
-      - name: Create Release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts (debug safety)
+        run: ls -R artifacts
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            SmartTranslateAi-Windows/SmartTranslateAi.exe
-            SmartTranslateAi-Linux-Ubuntu24/SmartTranslateAi
-            SmartTranslateAi-Android/*.apk
+          tag_name: ${{ github.ref_name }}
+          name: SmartTranslateAi ${{ github.ref_name }}
           generate_release_notes: true
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/SmartTranslateAi
+            artifacts/**/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
